@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="bg">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Речник на диалектни думи</title>
+  <style>
+    body { font-family: system-ui, Arial; padding: 1rem; max-width: 900px; margin: auto; }
+    input[type="text"] { padding: .5rem; width: 100%; margin-bottom: .8rem; box-sizing: border-box; }
+    ul { padding-left: 1.2rem; list-style: none; margin: 0; }
+    li { padding: .6rem .4rem; border-bottom: 1px solid #eee; }
+    .word { font-weight: 700; font-size: 1.05rem; }
+    .meta { color: #555; margin-left: .5rem; }
+    .meaning { color: #333; margin-top: .25rem; font-size: .95rem; }
+    .loading { color: #666; font-style: italic; }
+    .error { color: #c00; }
+  </style>
+</head>
+<body>
+  <h1>Речник на диалектни думи</h1>
+  <input id="search" type="text" placeholder="Търси дума, значение или район..." />
+  <div id="status" class="loading">Зареждане на данни…</div>
+  <ul id="list" aria-live="polite"></ul>
+
+  <script>
+    const statusEl = document.getElementById('status');
+    const listEl = document.getElementById('list');
+    const searchEl = document.getElementById('search');
+    let items = [];
+
+    function escapeHtml(s) {
+      return String(s)
+        .replaceAll('&','&amp;')
+        .replaceAll('<','&lt;')
+        .replaceAll('>','&gt;')
+        .replaceAll('"','&quot;')
+        .replaceAll("'",'&#39;');
+    }
+
+    function render(data) {
+      listEl.innerHTML = '';
+      if (!data || data.length === 0) {
+        listEl.innerHTML = '<li><em>Няма резултати.</em></li>';
+        return;
+      }
+      const fragment = document.createDocumentFragment();
+      for (const it of data) {
+        const li = document.createElement('li');
+        const word = escapeHtml(it.word || '');
+        const dialect = escapeHtml(it.dialect || '');
+        const meaning = escapeHtml(it.meaning || '');
+        const note = escapeHtml(it.note || '');
+        li.innerHTML = '<div><span class="word">' + word + '</span>' +
+                       (dialect ? '<span class="meta">(' + dialect + ')</span>' : '') +
+                       '</div>' +
+                       '<div class="meaning">' + meaning + (note ? ' — ' + note : '') + '</div>';
+        fragment.appendChild(li);
+      }
+      listEl.appendChild(fragment);
+    }
+
+    function applyFilter(q) {
+      if (!q) return render(items);
+      const ql = q.toLowerCase();
+      const filtered = items.filter(it =>
+        (it.word && it.word.toLowerCase().includes(ql)) ||
+        (it.meaning && it.meaning.toLowerCase().includes(ql)) ||
+        (it.dialect && it.dialect.toLowerCase().includes(ql)) ||
+        (it.note && it.note.toLowerCase().includes(ql))
+      );
+      render(filtered);
+    }
+
+    // Load JSON file (data.json) from same folder
+    fetch('data.json', {cache: "no-cache"})
+      .then(resp => {
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        return resp.json();
+      })
+      .then(json => {
+        items = Array.isArray(json) ? json : [];
+        statusEl.textContent = '';
+        render(items);
+      })
+      .catch(err => {
+        statusEl.textContent = 'Грешка при зареждане на данни: ' + err.message;
+        statusEl.className = 'error';
+        render([]);
+        console.error(err);
+      });
+
+    searchEl.addEventListener('input', () => {
+      applyFilter(searchEl.value.trim());
+    });
+  </script>
+</body>
+</html>
